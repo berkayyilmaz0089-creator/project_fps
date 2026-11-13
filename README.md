@@ -1,4 +1,4 @@
-# Project FPS
+# project-fps
 
 Welcome to Project FPS. This is a base game or a core framework that aims to let developers and/or game development enthusiasts make their own 3D FPS style games in Godot. While this project is optimized for FPS games in general, it can also be partially or completely used for other genres and games. This project includes:
 
