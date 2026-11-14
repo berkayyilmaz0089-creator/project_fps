@@ -7,11 +7,11 @@ public partial class PlayerAudio : Node
     [Export] public AudioStream DefaultJumpClip;
     [Export] public AudioStream DefaultLandClip;
 
-    [ExportGroup("Tagged Audio")]
-    [Export] public Godot.Collections.Array<string> TaggedGroups = new Godot.Collections.Array<string>();
-    [Export] public Godot.Collections.Array<AudioStream> TaggedWalkClips = new Godot.Collections.Array<AudioStream>();
-    [Export] public Godot.Collections.Array<AudioStream> TaggedJumpClips = new Godot.Collections.Array<AudioStream>();
-    [Export] public Godot.Collections.Array<AudioStream> TaggedLandClips = new Godot.Collections.Array<AudioStream>();
+    [ExportGroup("Grouped Audio")]
+    [Export] public Godot.Collections.Array<string> GroupNames = new Godot.Collections.Array<string>();
+    [Export] public Godot.Collections.Array<AudioStream> GroupedWalkClips = new Godot.Collections.Array<AudioStream>();
+    [Export] public Godot.Collections.Array<AudioStream> GroupedJumpClips = new Godot.Collections.Array<AudioStream>();
+    [Export] public Godot.Collections.Array<AudioStream> GroupedLandClips = new Godot.Collections.Array<AudioStream>();
 
     [ExportGroup("Audio Settings")]
     [Export] public float MinPitch = 0.85f;
@@ -134,15 +134,15 @@ public partial class PlayerAudio : Node
 
             if (hitCollider != null)
             {
-                int maxCount = Mathf.Min(TaggedGroups.Count, TaggedWalkClips.Count);
+                int maxCount = Mathf.Min(GroupNames.Count, GroupedWalkClips.Count);
                 
                 for (int i = 0; i < maxCount; i++)
                 {
-                    if (!string.IsNullOrEmpty(TaggedGroups[i]) && hitCollider.IsInGroup(TaggedGroups[i]))
+                    if (!string.IsNullOrEmpty(GroupNames[i]) && hitCollider.IsInGroup(GroupNames[i]))
                     {
-                        AudioStream walk = i < TaggedWalkClips.Count ? TaggedWalkClips[i] : null;
-                        AudioStream jump = i < TaggedJumpClips.Count ? TaggedJumpClips[i] : null;
-                        AudioStream land = i < TaggedLandClips.Count ? TaggedLandClips[i] : null;
+                        AudioStream walk = i < GroupedWalkClips.Count ? GroupedWalkClips[i] : null;
+                        AudioStream jump = i < GroupedJumpClips.Count ? GroupedJumpClips[i] : null;
+                        AudioStream land = i < GroupedLandClips.Count ? GroupedLandClips[i] : null;
                         
                         return (walk, jump, land);
                     }
