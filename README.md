@@ -4,6 +4,7 @@ Welcome to Project FPS. This is a base game or a core framework that aims to let
 
 1. Player Movement and Look scripts that let the player move and look around, jump, crouch, and sprint without any physics bugs
 2. Player Audio like footsteps depending on the speed and surface tag, jump and land sounds
+3. Save/Load system which handles saveable objects and scripts through ISaveable (NOTE: If you are going to make a commerical game, make sure to put in a real 256-AES encryption key in SaveManager.cs)
 
 This project includes third-party digital assets (including 3D models, textures, sound effects, and animations) obtained from open platforms under their respective free and attribution-friendly licensing terms. These assets are integrated solely for demonstration, testing, and aesthetic representation. They do not constitute the core functionality or original codebase of the framework. A credit list is formally documented in the LICENSINGINFO.md file included in this repository.
 
