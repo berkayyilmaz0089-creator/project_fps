@@ -1,6 +1,7 @@
 using Godot;
+using Godot.Collections;
 
-public partial class PlayerMovement : CharacterBody3D
+public partial class PlayerMovement : CharacterBody3D, ISaveable
 {
     [Signal] public delegate void StaminaChangedEventHandler(float current, float max);
 
@@ -283,6 +284,74 @@ public partial class PlayerMovement : CharacterBody3D
         {
             EmitSignal(SignalName.StaminaChanged, _currentStamina, MaxStamina);
             _lastStamina = _currentStamina;
+        }
+    }
+
+    public string GetSaveId()
+    {
+        return "PlayerMovement_ID";
+    }
+
+    public Dictionary CaptureState()
+    {
+        return new Dictionary
+        {
+            ["pos_x"] = GlobalPosition.X,
+            ["pos_y"] = GlobalPosition.Y,
+            ["pos_z"] = GlobalPosition.Z,
+            ["vel_x"] = Velocity.X,
+            ["vel_y"] = Velocity.Y,
+            ["vel_z"] = Velocity.Z,
+            ["is_crouching"] = _isCrouching,
+            ["current_stamina"] = _currentStamina,
+            ["is_exhausted"] = _isExhausted
+        };
+    }
+
+    public void RestoreState(Dictionary state)
+    {
+        if (state.ContainsKey("pos_x") && state.ContainsKey("pos_y") && state.ContainsKey("pos_z"))
+        {
+            GlobalPosition = new Vector3(
+                state["pos_x"].AsSingle(),
+                state["pos_y"].AsSingle(),
+                state["pos_z"].AsSingle()
+            );
+        }
+
+        if (state.ContainsKey("vel_x") && state.ContainsKey("vel_y") && state.ContainsKey("vel_z"))
+        {
+            Velocity = new Vector3(
+                state["vel_x"].AsSingle(),
+                state["vel_y"].AsSingle(),
+                state["vel_z"].AsSingle()
+            );
+        }
+
+        if (state.ContainsKey("is_crouching"))
+        {
+            _isCrouching = state["is_crouching"].AsBool();
+            ApplyCrouchInstant();
+            _skipNextCrouchRelease = true;
+        }
+
+        if (state.ContainsKey("current_stamina"))
+        {
+            _currentStamina = state["current_stamina"].AsSingle();
+            _lastStamina = _currentStamina;
+        }
+
+        if (state.ContainsKey("is_exhausted"))
+        {
+            _isExhausted = state["is_exhausted"].AsBool();
+        }
+    }
+
+    public void OnRestoreComplete()
+    {
+        if (CeilingCheck != null)
+        {
+            CeilingCheck.ForceShapecastUpdate();
         }
     }
 }

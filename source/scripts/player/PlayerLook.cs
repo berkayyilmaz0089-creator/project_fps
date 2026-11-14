@@ -1,6 +1,7 @@
 using Godot;
+using Godot.Collections;
 
-public partial class PlayerLook : Node3D
+public partial class PlayerLook : Node3D, ISaveable
 {
     public enum LookMode
     {
@@ -78,4 +79,36 @@ public partial class PlayerLook : Node3D
             HeadNode.Rotation = camRot;
         }
     }
+
+    public string GetSaveId()
+    {
+        return "PlayerLook_ID";
+    }
+
+    public Dictionary CaptureState()
+    {
+        return new Dictionary
+        {
+            ["pitch"] = _pitch,
+            ["body_rotation_y"] = PlayerBody != null ? Mathf.Wrap(PlayerBody.Rotation.Y, -Mathf.Pi, Mathf.Pi) : 0.0f
+        };
+    }
+
+    public void RestoreState(Dictionary state)
+    {
+        if (state.ContainsKey("pitch"))
+        {
+            _pitch = state["pitch"].AsSingle();
+            Rotation = new Vector3(Mathf.DegToRad(_pitch), 0, 0);
+        }
+
+        if (state.ContainsKey("body_rotation_y") && PlayerBody != null)
+        {
+            Vector3 bodyRot = PlayerBody.Rotation;
+            bodyRot.Y = state["body_rotation_y"].AsSingle();
+            PlayerBody.Rotation = bodyRot;
+        }
+    }
+
+    public void OnRestoreComplete() { }
 }
