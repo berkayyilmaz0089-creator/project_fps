@@ -7,3 +7,4 @@ panorama = ExtResource("1_f5ofg")
 
 [resource]
 sky_material = SubResource("acg_hi07tr5c")
+radiance_size = 2

@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+SceneManager="*uid://t36dcycyc5k2"
 SaveManager="*uid://dkssqasiem8pj"
 
 [display]
@@ -25,6 +26,17 @@ window/size/mode=3
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/vsync/vsync_mode=0
+
+[editor_plugins]
+
+enabled=PackedStringArray()
+
+[global_group]
+
+player=""
+save_icon=""
+saveable=""
+loading_ui=""
 
 [input]
 
@@ -104,6 +116,7 @@ debug={
 3d_physics/layer_1="default"
 3d_physics/layer_2="player"
 3d_physics/layer_3="environment"
+3d_physics/layer_4="triggers"
 
 [physics]
 
@@ -116,6 +129,7 @@ rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
 lights_and_shadows/directional_shadow/size=2048
 reflections/reflection_atlas/reflection_size=128
+occlusion_culling/occlusion_rays_per_thread=256
 occlusion_culling/use_occlusion_culling=true
 lights_and_shadows/positional_shadow/atlas_size=2048
 lights_and_shadows/positional_shadow/atlas_quadrant_0_subdiv=1
