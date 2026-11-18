@@ -22,6 +22,7 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_busy:
 		return
+
 	if event.is_action_pressed("quick_save"):
 		quick_save()
 	elif event.is_action_pressed("quick_load"):
@@ -30,12 +31,14 @@ func _unhandled_input(event: InputEvent) -> void:
 func quick_save() -> void:
 	if _is_busy:
 		return
+
 	var timestamp: String = Time.get_datetime_string_from_system().replace(":", "-").replace(" ", "_")
 	await save_game("QuickSave_" + timestamp)
 
 func quick_load() -> void:
 	if _is_busy:
 		return
+
 	var latest: String = _directory_handler.get_latest_save_file()
 	if not latest.is_empty():
 		await load_game(latest)
@@ -51,7 +54,6 @@ func save_game(save_name: String) -> void:
 	var file_path: String = _directory_handler.get_save_path(save_name)
 	var temp_path: String = _directory_handler.get_temp_path(save_name)
 
-	var scene_manager = get_tree().get_first_node_in_group("scene_manager")
 	var master_data: Dictionary = {
 		"version": SAVE_VERSION,
 		"timestamp": Time.get_datetime_string_from_system(),
@@ -59,9 +61,9 @@ func save_game(save_name: String) -> void:
 		"saved_nodes": {}
 	}
 
-	if scene_manager != null:
-		master_data["scene_path"] = scene_manager.get_active_scene_path()
-		master_data["saved_nodes"] = scene_manager.get_registry_data()
+	if SceneManager != null:
+		master_data["scene_path"] = SceneManager.get_active_scene_path()
+		master_data["saved_nodes"] = SceneManager.get_registry_data()
 
 	var json_string: String = JSON.stringify(master_data)
 	var file: FileAccess = FileAccess.open_encrypted_with_pass(temp_path, FileAccess.WRITE, SECRET_KEY)
@@ -110,14 +112,13 @@ func load_game(file_name: String) -> void:
 		return
 
 	var master_data: Dictionary = json.data
-	var scene_manager = get_tree().get_first_node_in_group("scene_manager")
 	
-	if scene_manager != null:
+	if SceneManager != null:
 		var saved_scene_path = master_data.get("scene_path", "")
 		var saved_nodes_dict = master_data.get("saved_nodes", {})
 		
 		if not saved_scene_path.is_empty():
-			await scene_manager.load_scene_for_save(saved_scene_path, saved_nodes_dict)
+			await SceneManager.load_scene_for_save(saved_scene_path, saved_nodes_dict)
 
 	get_tree().paused = false
 	await get_tree().create_timer(0.1, true).timeout

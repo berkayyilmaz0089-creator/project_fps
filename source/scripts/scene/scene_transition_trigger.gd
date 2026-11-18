@@ -16,7 +16,5 @@ func _on_body_entered(body: Node3D) -> void:
 	if target_scene_path.is_empty():
 		return
 
-	var scene_manager = get_tree().get_first_node_in_group("scene_manager")
-	
-	if scene_manager != null and not scene_manager._is_transitioning:
-		scene_manager.load_scene_async(target_scene_path, target_point_id, global_position, transition_volume, body)
+	if SceneManager != null and not SceneManager._is_transitioning:
+		SceneManager.load_scene_async(target_scene_path, target_point_id, global_position, transition_volume, body)

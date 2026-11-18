@@ -12,14 +12,13 @@ var _data_registry: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	add_to_group("scene_manager")
 	
 	_save_animations = SaveAnimations.new()
 	add_child(_save_animations)
 	
 	_persistent_container = Node.new()
 	_persistent_container.name = "PersistentContainer"
-	_persistent_container.process_mode = Node.PROCESS_MODE_DISABLED
+	_persistent_container.process_mode = Node.PROCESS_MODE_INHERIT
 	add_child(_persistent_container)
 	
 	var current_scene = get_tree().current_scene
@@ -45,7 +44,8 @@ func load_scene_async(target_scene_path: String, target_point_id: String, source
 	var moved_objects_data: Array[Dictionary] = []
 
 	if old_scene != null:
-		_capture_and_store_scene_data(old_scene)
+		_capture_scene_data(old_scene)
+		_capture_persistent_container_data()
 		
 		if transition_volume != null:
 			var bodies = await transition_volume.get_saveable_bodies()
@@ -65,7 +65,6 @@ func load_scene_async(target_scene_path: String, target_point_id: String, source
 	var new_scene = await _get_or_load_scene(target_scene_path)
 	
 	if new_scene == null:
-		push_error("[SceneManager] Failed to load new scene!")
 		get_tree().paused = false
 		_is_transitioning = false
 		return
@@ -130,8 +129,7 @@ func load_scene_for_save(target_scene_path: String, saved_nodes_dict: Dictionary
 	
 	_clear_all_scenes()
 	
-	for id in saved_nodes_dict:
-		_data_registry[id] = saved_nodes_dict[id]
+	_data_registry = saved_nodes_dict.duplicate(true)
 	
 	var new_scene = await _get_or_load_scene(target_scene_path)
 	
@@ -145,30 +143,137 @@ func load_scene_for_save(target_scene_path: String, saved_nodes_dict: Dictionary
 		await RenderingServer.frame_pre_draw
 		
 		_apply_registry_data(new_scene)
+		_restore_persistent_container_nodes()
 		
 	_is_transitioning = false
 
-func _capture_and_store_scene_data(scene: Node) -> void:
-	var saveables = scene.find_children("*", "", true, false)
+func _capture_scene_data(scene: Node) -> void:
+	if scene == null:
+		return
+
+	var saveables: Array[Node] = [scene]
+	saveables.append_array(scene.find_children("*", "", true, false))
+	
 	for node in saveables:
-		if node.is_in_group("saveable") and node.has_method("capture_state") and node.has_method("get_save_id"):
+		if is_instance_valid(node) and node.is_in_group("saveable") and node.has_method("capture_state") and node.has_method("get_save_id"):
 			var id = node.get_save_id()
 			if not id.is_empty():
-				_data_registry[id] = node.capture_state()
+				var state: Dictionary = node.capture_state()
+				state["_scene_path"] = scene.scene_file_path
+				state["_is_persistent"] = false
+				
+				if not node.scene_file_path.is_empty():
+					state["_object_scene_path"] = node.scene_file_path
+				elif node.has_method("get_object_scene_path"):
+					state["_object_scene_path"] = node.get_object_scene_path()
+				
+				_data_registry[id] = state
 
-func _apply_registry_data(scene: Node) -> void:
-	var saveables = scene.find_children("*", "", true, false)
-	for node in saveables:
-		if node.is_in_group("saveable") and node.has_method("restore_state") and node.has_method("get_save_id"):
+func _capture_persistent_container_data() -> void:
+	if _persistent_container == null:
+		return
+
+	for node in _persistent_container.get_children():
+		if is_instance_valid(node) and node.is_in_group("saveable") and node.has_method("capture_state") and node.has_method("get_save_id"):
 			var id = node.get_save_id()
-			if _data_registry.has(id):
-				node.restore_state(_data_registry[id])
-				if node.has_method("on_restore_complete"):
-					node.on_restore_complete()
+			if not id.is_empty():
+				var state: Dictionary = node.capture_state()
+				if not state.has("_scene_path") or state["_scene_path"].is_empty():
+					state["_scene_path"] = node.scene_file_path if node.scene_file_path != "" else get_active_scene_path()
+				state["_is_persistent"] = true
+				
+				if not node.scene_file_path.is_empty():
+					state["_object_scene_path"] = node.scene_file_path
+				elif node.has_method("get_object_scene_path"):
+					state["_object_scene_path"] = node.get_object_scene_path()
+				
+				_data_registry[id] = state
 
 func get_registry_data() -> Dictionary:
-	_capture_and_store_scene_data(get_tree().current_scene)
-	return _data_registry.duplicate(true)
+	var current_scene = get_tree().current_scene
+	if current_scene != null:
+		_capture_scene_data(current_scene)
+		
+	_capture_persistent_container_data()
+	return _data_registry.duplicate(true)		
+			
+func _apply_registry_data(scene: Node) -> void:
+	var existing_ids: Dictionary = {}
+	var saveables = scene.find_children("*", "", true, false)
+	
+	for node in saveables:
+		if is_instance_valid(node) and node.is_in_group("saveable") and node.has_method("get_save_id"):
+			existing_ids[node.get_save_id()] = node
+
+	var processed_ids: Dictionary = {}
+
+	for id in _data_registry:
+		if processed_ids.has(id):
+			continue
+
+		var state: Dictionary = _data_registry[id]
+		var is_persistent: bool = state.get("_is_persistent", false)
+		
+		if is_persistent:
+			continue
+
+		if existing_ids.has(id):
+			var node = existing_ids[id]
+			if is_instance_valid(node):
+				node.restore_state(state)
+				if node.has_method("on_restore_complete"):
+					node.on_restore_complete()
+			processed_ids[id] = true
+		else:
+			var object_scene_path = state.get("_object_scene_path", "")
+			var target_scene_path = state.get("_scene_path", "")
+			
+			if not object_scene_path.is_empty() and target_scene_path == scene.scene_file_path:
+				var packed = ResourceLoader.load(object_scene_path) as PackedScene
+				if packed != null:
+					var new_node = packed.instantiate()
+					scene.add_child(new_node)
+					_restore_all_subsaveables(new_node, processed_ids)
+
+func _restore_persistent_container_nodes() -> void:
+	if _persistent_container == null:
+		return
+
+	var processed_ids: Dictionary = {}
+
+	for id in _data_registry:
+		if processed_ids.has(id):
+			continue
+
+		var state: Dictionary = _data_registry[id]
+		var is_persistent: bool = state.get("_is_persistent", false)
+		
+		if not is_persistent:
+			continue
+
+		var object_scene_path = state.get("_object_scene_path", "")
+		if not object_scene_path.is_empty():
+			var packed = ResourceLoader.load(object_scene_path) as PackedScene
+			if packed != null:
+				var new_node = packed.instantiate()
+				_persistent_container.add_child(new_node)
+				_restore_all_subsaveables(new_node, processed_ids)
+
+func _restore_all_subsaveables(node: Node, processed_ids: Dictionary) -> void:
+	if not is_instance_valid(node):
+		return
+
+	if node.is_in_group("saveable") and node.has_method("get_save_id") and node.has_method("restore_state"):
+		var id = node.get_save_id()
+		if not id.is_empty() and _data_registry.has(id) and not processed_ids.has(id):
+			var state = _data_registry[id]
+			node.restore_state(state)
+			if node.has_method("on_restore_complete"):
+				node.on_restore_complete()
+			processed_ids[id] = true
+
+	for child in node.get_children():
+		_restore_all_subsaveables(child, processed_ids)
 
 func _clear_all_scenes() -> void:
 	if get_tree().current_scene != null:
@@ -183,22 +288,37 @@ func _clear_all_scenes() -> void:
 	_scene_pool.clear()
 	
 	for child in _persistent_container.get_children():
-		child.queue_free()
+		if is_instance_valid(child):
+			child.queue_free()
 
 func _put_scene_to_sleep(scene: Node) -> void:
+	if not is_instance_valid(scene):
+		return
+
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	scene.visible = false
 	_disable_all_physics_and_audio(scene)
-	get_tree().root.remove_child(scene)
+	if scene.get_parent() != null:
+		scene.get_parent().remove_child(scene)
 	_scene_pool[scene.scene_file_path] = scene
 
 func _wake_up_scene(scene: Node) -> void:
+	if not is_instance_valid(scene):
+		return
+
 	scene.process_mode = Node.PROCESS_MODE_INHERIT
 	scene.visible = true
 	_enable_all_physics_and_audio(scene)
 
 func _disable_all_physics_and_audio(node: Node) -> void:
-	if node is CollisionObject3D:
+	if not is_instance_valid(node):
+		return
+
+	if node is RigidBody3D:
+		if not node.has_meta("orig_freeze"):
+			node.set_meta("orig_freeze", node.freeze)
+		node.set_deferred("freeze", true)
+	elif node is CollisionObject3D:
 		if not node.has_meta("orig_layer"):
 			node.set_meta("orig_layer", node.collision_layer)
 			node.set_meta("orig_mask", node.collision_mask)
@@ -213,7 +333,13 @@ func _disable_all_physics_and_audio(node: Node) -> void:
 		_disable_all_physics_and_audio(child)
 
 func _enable_all_physics_and_audio(node: Node) -> void:
-	if node is CollisionObject3D:
+	if not is_instance_valid(node):
+		return
+
+	if node is RigidBody3D:
+		if node.has_meta("orig_freeze"):
+			node.set_deferred("freeze", node.get_meta("orig_freeze"))
+	elif node is CollisionObject3D:
 		if node.has_meta("orig_layer"):
 			node.set_deferred("collision_layer", node.get_meta("orig_layer"))
 			node.set_deferred("collision_mask", node.get_meta("orig_mask"))
@@ -224,7 +350,7 @@ func _enable_all_physics_and_audio(node: Node) -> void:
 		_enable_all_physics_and_audio(child)
 
 func _get_or_load_scene(target_scene_path: String) -> Node:
-	if _scene_pool.has(target_scene_path):
+	if _scene_pool.has(target_scene_path) and is_instance_valid(_scene_pool[target_scene_path]):
 		return _scene_pool[target_scene_path]
 
 	ResourceLoader.load_threaded_request(target_scene_path)
@@ -238,6 +364,9 @@ func _get_or_load_scene(target_scene_path: String) -> Node:
 		return null
 
 	var packed: PackedScene = ResourceLoader.load_threaded_get(target_scene_path)
+	if packed == null:
+		return null
+
 	var instance: Node = packed.instantiate()
 	_scene_pool[target_scene_path] = instance
 	return instance

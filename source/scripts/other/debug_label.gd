@@ -7,7 +7,6 @@ var _is_visible: bool = false
 var _update_timer: float = 0.0
 
 var _fps: float = 0.0
-var _average_fps: float = 0.0
 var _frame_time_ms: float = 0.0
 
 var _accumulated_frames: int = 0
@@ -35,9 +34,6 @@ func _process(delta: float) -> void:
 	_update_timer += delta
 
 	if _update_timer >= update_interval:
-		if _accumulated_time > 0.0:
-			_average_fps = _accumulated_frames / _accumulated_time
-
 		_update_text()
 
 		_update_timer = 0.0
@@ -51,7 +47,7 @@ func _update_text() -> void:
 	var physics_time: float = Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
 	var vram_usage: float = Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / (1024.0 * 1024.0)
 
-	var stats: String = "FPS: %d (Avg: %d)\n" % [roundi(_fps), roundi(_average_fps)]
+	var stats: String = "FPS: %d \n" % [roundi(_fps)]
 	stats += "Frame Time: %.2f ms\n" % _frame_time_ms
 	stats += "Physics Time: %.2f ms\n" % physics_time
 	stats += "Objects: %d\n" % object_count
